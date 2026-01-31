@@ -18,7 +18,7 @@
   "systems": [
     "cyberpunk-red-core"
   ],
-  "url": "https://github.com/YOUR-USERNAME/cyberpunk-armor-halving",
-  "manifest": "https://raw.githubusercontent.com/YOUR-USERNAME/cyberpunk-armor-halving/main/module.json",
-  "download": "https://github.com/YOUR-USERNAME/cyberpunk-armor-halving/archive/refs/heads/main.zip"
+  "url": "https://github.com/meruklee-lgtm/cyberpunk-armor-halving",
+  "manifest": "https://raw.githubusercontent.com/meruklee-lgtm/cyberpunk-armor-halving/main/module.json",
+  "download": "https://github.com/meruklee-lgtm/cyberpunk-armor-halving/archive/refs/heads/main.zip"
 }
