@@ -28,37 +28,36 @@ Hooks.once('ready', () => {
   
   console.log('Cyberpunk Armor Halving | Aktiviert - Panzerungswerte werden halbiert');
   
-  // Patch die prepareDerivedData Methode für Armor Items
   const originalPrepareData = CONFIG.Item.documentClass.prototype.prepareDerivedData;
   
   CONFIG.Item.documentClass.prototype.prepareDerivedData = function() {
     originalPrepareData.call(this);
     
-    // Nur für Armor-Items und nur wenn aktiviert
     if (this.type === 'armor' && game.settings.get('cyberpunk-armor-halving', 'enabled')) {
-      // Halbiere Body Location SP
+      // Body Location
       if (this.system.bodyLocation?.sp !== undefined) {
-        const originalBodySP = this.system.bodyLocation.sp;
-        const halvedValue = Math.floor(originalBodySP / 2);
-        // Verhindere negative Werte
-        this.system.bodyLocation.sp = Math.max(0, halvedValue);
+        this.system.bodyLocation.sp = Math.floor(this.system.bodyLocation.sp / 2);
+        
+        // Ablation kann nicht größer als SP sein (verhindert negative Werte)
+        if (this.system.bodyLocation.ablation > this.system.bodyLocation.sp) {
+          this.system.bodyLocation.ablation = this.system.bodyLocation.sp;
+        }
       }
       
-      // Halbiere Head Location SP
+      // Head Location
       if (this.system.headLocation?.sp !== undefined) {
-        const originalHeadSP = this.system.headLocation.sp;
-        const halvedValue = Math.floor(originalHeadSP / 2);
-        // Verhindere negative Werte
-        this.system.headLocation.sp = Math.max(0, halvedValue);
+        this.system.headLocation.sp = Math.floor(this.system.headLocation.sp / 2);
+        
+        // Ablation kann nicht größer als SP sein
+        if (this.system.headLocation.ablation > this.system.headLocation.sp) {
+          this.system.headLocation.ablation = this.system.headLocation.sp;
+        }
       }
       
-      // Optional: Halbiere auch Shield Hit Points (wenn aktiviert)
+      // Shields (optional)
       if (game.settings.get('cyberpunk-armor-halving', 'halveshields')) {
         if (this.system.shieldHitPoints?.max !== undefined) {
-          const originalShieldMax = this.system.shieldHitPoints.max;
-          this.system.shieldHitPoints.max = Math.max(0, Math.floor(originalShieldMax / 2));
-          
-          // Passe auch den aktuellen Wert an
+          this.system.shieldHitPoints.max = Math.floor(this.system.shieldHitPoints.max / 2);
           if (this.system.shieldHitPoints.value > this.system.shieldHitPoints.max) {
             this.system.shieldHitPoints.value = this.system.shieldHitPoints.max;
           }
@@ -70,11 +69,9 @@ Hooks.once('ready', () => {
   console.log('Cyberpunk Armor Halving | Armor-Patch erfolgreich angewendet');
 });
 
-// Zeige halbierten Wert visuell im Character Sheet
 Hooks.on('renderItemSheet', (app, html, data) => {
   if (!game.settings.get('cyberpunk-armor-halving', 'enabled')) return;
   if (app.item.type !== 'armor') return;
   
-  // Füge visuellen Hinweis hinzu
   html.find('.window-title').append(' <span style="color: #ff6b6b; font-size: 0.8em;">[SP halbiert]</span>');
 });
