@@ -2,7 +2,7 @@
   "id": "cyberpunk-armor-halving",
   "title": "Cyberpunk RED - Armor Halving",
   "description": "Halbiert automatisch alle Panzerungswerte (SP) im Spiel",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "compatibility": {
     "minimum": "11",
     "verified": "12"
