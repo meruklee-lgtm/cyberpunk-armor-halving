@@ -28,35 +28,42 @@ Hooks.once('ready', () => {
   
   console.log('Cyberpunk Armor Halving | Aktiviert');
   
+  // Speichere Original-Werte für alle existierenden Armor-Items
+  game.actors.forEach(actor => {
+    actor.items.filter(i => i.type === 'armor').forEach(async armor => {
+      if (!armor.getFlag('cyberpunk-armor-halving', 'originalBodySP')) {
+        // Speichere Original-Werte als Flag (wird nur einmal gesetzt)
+        await armor.setFlag('cyberpunk-armor-halving', 'originalBodySP', armor.system.bodyLocation?.sp);
+        await armor.setFlag('cyberpunk-armor-halving', 'originalHeadSP', armor.system.headLocation?.sp);
+        await armor.setFlag('cyberpunk-armor-halving', 'originalShieldMax', armor.system.shieldHitPoints?.max);
+        console.log(`Cyberpunk Armor Halving | Original-Werte gespeichert für: ${armor.name}`);
+      }
+    });
+  });
+  
   const originalPrepare = CONFIG.Item.documentClass.prototype.prepareDerivedData;
   
   CONFIG.Item.documentClass.prototype.prepareDerivedData = function() {
     originalPrepare.call(this);
     
     if (this.type === 'armor' && game.settings.get('cyberpunk-armor-halving', 'enabled')) {
-      // Hole Original-Werte aus _source (unveränderliche DB-Werte)
-      const origBodySP = this._source.system.bodyLocation?.sp;
-      const origHeadSP = this._source.system.headLocation?.sp;
+      // Hole Original-Werte aus Flags (werden nur einmal gesetzt, nie geändert)
+      const origBodySP = this.getFlag('cyberpunk-armor-halving', 'originalBodySP');
+      const origHeadSP = this.getFlag('cyberpunk-armor-halving', 'originalHeadSP');
+      const origShieldMax = this.getFlag('cyberpunk-armor-halving', 'originalShieldMax');
       
       // Body Location
       if (this.system.bodyLocation?.sp !== undefined && origBodySP !== undefined) {
-        const halvedSP = Math.floor(origBodySP / 2);
-        this.system.bodyLocation.sp = halvedSP;
-        
-        // Ablation wird NICHT verändert (bleibt original)
-        // Effektiver SP kann negativ sein, aber wir zeigen min. 0
+        this.system.bodyLocation.sp = Math.floor(origBodySP / 2);
       }
       
       // Head Location
       if (this.system.headLocation?.sp !== undefined && origHeadSP !== undefined) {
-        const halvedSP = Math.floor(origHeadSP / 2);
-        this.system.headLocation.sp = halvedSP;
+        this.system.headLocation.sp = Math.floor(origHeadSP / 2);
       }
       
       // Shields
       if (game.settings.get('cyberpunk-armor-halving', 'halveshields')) {
-        const origShieldMax = this._source.system.shieldHitPoints?.max;
-        
         if (this.system.shieldHitPoints?.max !== undefined && origShieldMax !== undefined) {
           this.system.shieldHitPoints.max = Math.floor(origShieldMax / 2);
         }
@@ -67,16 +74,27 @@ Hooks.once('ready', () => {
   console.log('Cyberpunk Armor Halving | Patch angewendet');
 });
 
+// Speichere Original-Werte für neue Armor-Items
+Hooks.on('createItem', async (item, options, userId) => {
+  if (item.type === 'armor' && game.settings.get('cyberpunk-armor-halving', 'enabled')) {
+    if (!item.getFlag('cyberpunk-armor-halving', 'originalBodySP')) {
+      await item.setFlag('cyberpunk-armor-halving', 'originalBodySP', item.system.bodyLocation?.sp);
+      await item.setFlag('cyberpunk-armor-halving', 'originalHeadSP', item.system.headLocation?.sp);
+      await item.setFlag('cyberpunk-armor-halving', 'originalShieldMax', item.system.shieldHitPoints?.max);
+      console.log(`Cyberpunk Armor Halving | Original-Werte gespeichert für neues Item: ${item.name}`);
+    }
+  }
+});
+
 // Verhindere negative SP-Anzeige im Character Sheet
 Hooks.on('renderActorSheet', (app, html, data) => {
   if (!game.settings.get('cyberpunk-armor-halving', 'enabled')) return;
   
-  // Finde alle Armor-Items und korrigiere die Anzeige
   app.actor.items.filter(i => i.type === 'armor').forEach(armor => {
     const armorElement = html.find(`[data-item-id="${armor.id}"]`);
     
     if (armorElement.length) {
-      // Body Location (armor-1-stats)
+      // Body Location
       if (armor.system.bodyLocation?.sp !== undefined) {
         const bodySP = armor.system.bodyLocation.sp;
         const bodyAblation = armor.system.bodyLocation.ablation || 0;
@@ -84,12 +102,11 @@ Hooks.on('renderActorSheet', (app, html, data) => {
         
         const bodyStatsElement = armorElement.find('.armor-1-stats');
         if (bodyStatsElement.length) {
-          // Ersetze den Text: "X/Y" wobei X nie negativ ist
           bodyStatsElement.text(`${effectiveSP}/${bodySP}`);
         }
       }
       
-      // Head Location (armor-2-stats)
+      // Head Location
       if (armor.system.headLocation?.sp !== undefined) {
         const headSP = armor.system.headLocation.sp;
         const headAblation = armor.system.headLocation.ablation || 0;
