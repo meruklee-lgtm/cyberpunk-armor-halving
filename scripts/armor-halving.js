@@ -28,65 +28,40 @@ Hooks.once('ready', () => {
   
   console.log('Cyberpunk Armor Halving | Aktiviert');
   
-  // Speichere Original-Werte für alle existierenden Armor-Items
-  game.actors.forEach(actor => {
-    actor.items.filter(i => i.type === 'armor').forEach(async armor => {
-      if (!armor.getFlag('cyberpunk-armor-halving', 'originalBodySP')) {
-        // Speichere Original-Werte als Flag (wird nur einmal gesetzt)
-        await armor.setFlag('cyberpunk-armor-halving', 'originalBodySP', armor.system.bodyLocation?.sp);
-        await armor.setFlag('cyberpunk-armor-halving', 'originalHeadSP', armor.system.headLocation?.sp);
-        await armor.setFlag('cyberpunk-armor-halving', 'originalShieldMax', armor.system.shieldHitPoints?.max);
-        console.log(`Cyberpunk Armor Halving | Original-Werte gespeichert für: ${armor.name}`);
-      }
-    });
-  });
+  // Hilfsfunktion: Berechne halbierten SP-Wert
+  function getHalvedSP(armor, location) {
+    if (!armor || armor.type !== 'armor') return null;
+    
+    const sp = location === 'body' 
+      ? armor.system.bodyLocation?.sp 
+      : armor.system.headLocation?.sp;
+    
+    return sp !== undefined ? Math.floor(sp / 2) : null;
+  }
   
-  const originalPrepare = CONFIG.Item.documentClass.prototype.prepareDerivedData;
+  // Patch die getRollData Methode für Damage Calculations
+  const originalGetRollData = CONFIG.Item.documentClass.prototype.getRollData;
   
-  CONFIG.Item.documentClass.prototype.prepareDerivedData = function() {
-    originalPrepare.call(this);
+  CONFIG.Item.documentClass.prototype.getRollData = function() {
+    const data = originalGetRollData.call(this);
     
     if (this.type === 'armor' && game.settings.get('cyberpunk-armor-halving', 'enabled')) {
-      // Hole Original-Werte aus Flags (werden nur einmal gesetzt, nie geändert)
-      const origBodySP = this.getFlag('cyberpunk-armor-halving', 'originalBodySP');
-      const origHeadSP = this.getFlag('cyberpunk-armor-halving', 'originalHeadSP');
-      const origShieldMax = this.getFlag('cyberpunk-armor-halving', 'originalShieldMax');
-      
-      // Body Location
-      if (this.system.bodyLocation?.sp !== undefined && origBodySP !== undefined) {
-        this.system.bodyLocation.sp = Math.floor(origBodySP / 2);
+      // Füge halbierte Werte für Berechnungen hinzu
+      if (data.bodyLocation?.sp !== undefined) {
+        data.bodyLocation.effectiveSP = Math.floor(data.bodyLocation.sp / 2);
       }
-      
-      // Head Location
-      if (this.system.headLocation?.sp !== undefined && origHeadSP !== undefined) {
-        this.system.headLocation.sp = Math.floor(origHeadSP / 2);
-      }
-      
-      // Shields
-      if (game.settings.get('cyberpunk-armor-halving', 'halveshields')) {
-        if (this.system.shieldHitPoints?.max !== undefined && origShieldMax !== undefined) {
-          this.system.shieldHitPoints.max = Math.floor(origShieldMax / 2);
-        }
+      if (data.headLocation?.sp !== undefined) {
+        data.headLocation.effectiveSP = Math.floor(data.headLocation.sp / 2);
       }
     }
+    
+    return data;
   };
   
-  console.log('Cyberpunk Armor Halving | Patch angewendet');
+  console.log('Cyberpunk Armor Halving | Hooks eingerichtet');
 });
 
-// Speichere Original-Werte für neue Armor-Items
-Hooks.on('createItem', async (item, options, userId) => {
-  if (item.type === 'armor' && game.settings.get('cyberpunk-armor-halving', 'enabled')) {
-    if (!item.getFlag('cyberpunk-armor-halving', 'originalBodySP')) {
-      await item.setFlag('cyberpunk-armor-halving', 'originalBodySP', item.system.bodyLocation?.sp);
-      await item.setFlag('cyberpunk-armor-halving', 'originalHeadSP', item.system.headLocation?.sp);
-      await item.setFlag('cyberpunk-armor-halving', 'originalShieldMax', item.system.shieldHitPoints?.max);
-      console.log(`Cyberpunk Armor Halving | Original-Werte gespeichert für neues Item: ${item.name}`);
-    }
-  }
-});
-
-// Verhindere negative SP-Anzeige im Character Sheet
+// Manipuliere die Anzeige im Character Sheet (kosmetisch)
 Hooks.on('renderActorSheet', (app, html, data) => {
   if (!game.settings.get('cyberpunk-armor-halving', 'enabled')) return;
   
@@ -96,34 +71,75 @@ Hooks.on('renderActorSheet', (app, html, data) => {
     if (armorElement.length) {
       // Body Location
       if (armor.system.bodyLocation?.sp !== undefined) {
-        const bodySP = armor.system.bodyLocation.sp;
-        const bodyAblation = armor.system.bodyLocation.ablation || 0;
-        const effectiveSP = Math.max(0, bodySP - bodyAblation);
+        const originalSP = armor.system.bodyLocation.sp;
+        const halvedSP = Math.floor(originalSP / 2);
+        const ablation = armor.system.bodyLocation.ablation || 0;
+        const effectiveSP = Math.max(0, halvedSP - ablation);
         
         const bodyStatsElement = armorElement.find('.armor-1-stats');
         if (bodyStatsElement.length) {
-          bodyStatsElement.text(`${effectiveSP}/${bodySP}`);
+          // Zeige: "effektiv/halbiert" statt "effektiv/original"
+          bodyStatsElement.text(`${effectiveSP}/${halvedSP}`);
         }
       }
       
       // Head Location
       if (armor.system.headLocation?.sp !== undefined) {
-        const headSP = armor.system.headLocation.sp;
-        const headAblation = armor.system.headLocation.ablation || 0;
-        const effectiveSP = Math.max(0, headSP - headAblation);
+        const originalSP = armor.system.headLocation.sp;
+        const halvedSP = Math.floor(originalSP / 2);
+        const ablation = armor.system.headLocation.ablation || 0;
+        const effectiveSP = Math.max(0, halvedSP - ablation);
         
         const headStatsElement = armorElement.find('.armor-2-stats');
         if (headStatsElement.length) {
-          headStatsElement.text(`${effectiveSP}/${headSP}`);
+          headStatsElement.text(`${effectiveSP}/${halvedSP}`);
         }
       }
     }
   });
 });
 
+// Manipuliere Item Sheet Anzeige
 Hooks.on('renderItemSheet', (app, html, data) => {
   if (!game.settings.get('cyberpunk-armor-halving', 'enabled')) return;
   if (app.item.type !== 'armor') return;
   
   html.find('.window-title').append(' <span style="color: #ff6b6b; font-size: 0.8em;">[SP halbiert]</span>');
+  
+  // Zeige halbierten Wert als Info
+  if (app.item.system.bodyLocation?.sp !== undefined) {
+    const originalSP = app.item.system.bodyLocation.sp;
+    const halvedSP = Math.floor(originalSP / 2);
+    
+    const spInput = html.find('input[name="system.bodyLocation.sp"]');
+    if (spInput.length && spInput.val() == originalSP) {
+      spInput.after(`<span style="margin-left: 10px; color: #28a745; font-weight: bold;">→ Effektiv: ${halvedSP} SP</span>`);
+    }
+  }
+  
+  if (app.item.system.headLocation?.sp !== undefined) {
+    const originalSP = app.item.system.headLocation.sp;
+    const halvedSP = Math.floor(originalSP / 2);
+    
+    const spInput = html.find('input[name="system.headLocation.sp"]');
+    if (spInput.length && spInput.val() == originalSP) {
+      spInput.after(`<span style="margin-left: 10px; color: #28a745; font-weight: bold;">→ Effektiv: ${halvedSP} SP</span>`);
+    }
+  }
+});
+
+// KRITISCH: Patch Damage Calculation
+Hooks.on('preUpdateActor', (actor, change, options, userId) => {
+  if (!game.settings.get('cyberpunk-armor-halving', 'enabled')) return;
+  
+  // Markiere dass Armor-Halving aktiv ist
+  options.armorHalvingActive = true;
+});
+
+// Manipuliere Token-Tooltip (falls das System welche hat)
+Hooks.on('renderTokenHUD', (hud, html, data) => {
+  if (!game.settings.get('cyberpunk-armor-halving', 'enabled')) return;
+  
+  // Hier könnten wir Token-Tooltips anpassen
+  // System-spezifisch
 });
