@@ -39,22 +39,26 @@ Hooks.once('ready', () => {
       // Halbiere Body Location SP
       if (this.system.bodyLocation?.sp !== undefined) {
         const originalBodySP = this.system.bodyLocation.sp;
-        this.system.bodyLocation.sp = Math.floor(originalBodySP / 2);
+        const halvedValue = Math.floor(originalBodySP / 2);
+        // Verhindere negative Werte
+        this.system.bodyLocation.sp = Math.max(0, halvedValue);
       }
       
       // Halbiere Head Location SP
       if (this.system.headLocation?.sp !== undefined) {
         const originalHeadSP = this.system.headLocation.sp;
-        this.system.headLocation.sp = Math.floor(originalHeadSP / 2);
+        const halvedValue = Math.floor(originalHeadSP / 2);
+        // Verhindere negative Werte
+        this.system.headLocation.sp = Math.max(0, halvedValue);
       }
       
       // Optional: Halbiere auch Shield Hit Points (wenn aktiviert)
       if (game.settings.get('cyberpunk-armor-halving', 'halveshields')) {
         if (this.system.shieldHitPoints?.max !== undefined) {
           const originalShieldMax = this.system.shieldHitPoints.max;
-          this.system.shieldHitPoints.max = Math.floor(originalShieldMax / 2);
+          this.system.shieldHitPoints.max = Math.max(0, Math.floor(originalShieldMax / 2));
           
-          // Passe auch den aktuellen Wert an, falls er größer als das neue Maximum ist
+          // Passe auch den aktuellen Wert an
           if (this.system.shieldHitPoints.value > this.system.shieldHitPoints.max) {
             this.system.shieldHitPoints.value = this.system.shieldHitPoints.max;
           }
